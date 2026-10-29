@@ -1,0 +1,23 @@
+# Go
+/bin/
+/dist/
+*.test
+*.out
+
+# Rust
+/proxy/target/
+
+# Env / local
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Built binary
+/forge
