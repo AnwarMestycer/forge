@@ -1,5 +1,8 @@
 # forge task runner — install with: sudo dnf install just
 
+# Container engine for the testbed; override with FORGE_COMPOSE="podman compose".
+compose := env("FORGE_COMPOSE", "docker compose")
+
 default:
     @just --list
 
@@ -16,4 +19,7 @@ lint:
     cd proxy && cargo clippy -- -D warnings
 
 run-testbed:
-    docker compose -f testbed/docker-compose.yml up -d
+    {{compose}} -f testbed/docker-compose.yml up -d --build
+
+stop-testbed:
+    {{compose}} -f testbed/docker-compose.yml down
