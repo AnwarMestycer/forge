@@ -10,7 +10,7 @@ Pace: ~8–10 h/week, part-time. Two tracks run in parallel (Go on weekdays, Rus
 | # | Milestone | Track | Weeks | Status |
 |---|---|---|---|---|
 | M0 | Foundations | Go + Rust | 1 | 🟡 In progress |
-| Spike | Rust TCP proxy spike | Rust | 1 | ⚪ Not started |
+| Spike | Rust TCP proxy spike | Rust | 1 | 🟡 In progress |
 | Testbed | Sample NestJS + Postgres app | — | 1 | ⚪ Not started |
 | M1 | Forge core | Go | 2–3 | ⚪ Not started |
 | M2 | Vouch v1 (rules) | Go | 4–5 | ⚪ Not started |
@@ -39,8 +39,8 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 **Done when:** `forge --version` installs as one binary on Fedora; `forge add .` and `forge list` work.
 
 ## Spike — Rust TCP proxy (week 1)
-- [ ] `tokio` proxy: listen `:6544` → forward to Postgres `:5432`
-- [ ] Fixed 200 ms delay on every packet
+- [x] `tokio` proxy: listen `:6544` → forward to Postgres `:5432`
+- [x] Fixed 200 ms delay on every packet
 - [ ] `psql -p 6544` works and is visibly slow
 
 **Done when:** real Postgres traffic flows through Rust and you can feel the latency.
