@@ -19,8 +19,8 @@ func NewRootCmd(version string) *cobra.Command {
 	root.SetVersionTemplate("forge {{.Version}}\n")
 
 	root.AddCommand(
-		stubCmd("add [path]", "Register a project with forge (default: current directory)"),
-		stubCmd("list", "List registered projects"),
+		newAddCmd(),
+		newListCmd(),
 		stubCmd("switch <project>", "Switch to a project"),
 		stubCmd("context", "Show or sync the current project's CLAUDE.md context"),
 		stubCmd("vouch", "Risk report for the current diff (auth/RLS, migrations, env, tests, deps)"),

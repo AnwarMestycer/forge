@@ -39,3 +39,25 @@ func TestStubCommandsExist(t *testing.T) {
 		}
 	}
 }
+
+func TestAddAndList(t *testing.T) {
+	t.Setenv("FORGE_HOME", t.TempDir())
+	project := t.TempDir()
+
+	out, err := run(t, "list")
+	if err != nil || !strings.Contains(out, "no projects yet") {
+		t.Fatalf("empty list: %v %q", err, out)
+	}
+
+	if out, err = run(t, "add", project, "--name", "demo"); err != nil {
+		t.Fatalf("add: %v %q", err, out)
+	}
+	if _, err = run(t, "add", project); err == nil {
+		t.Fatal("adding the same path twice should fail")
+	}
+
+	out, err = run(t, "list")
+	if err != nil || !strings.Contains(out, "demo") || !strings.Contains(out, project) {
+		t.Fatalf("list: %v %q", err, out)
+	}
+}

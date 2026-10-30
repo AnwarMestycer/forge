@@ -33,7 +33,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 - [x] `justfile`: `build`, `test`, `lint`, `run-testbed`
 - [x] CI: Go build/test/`golangci-lint`, Rust build/test/`clippy`
 - [x] cobra root with stub commands: `add`, `list`, `switch`, `context`, `vouch`, `chaos`
-- [ ] `~/.forge/` config + SQLite with `projects` table
+- [x] `~/.forge/` config + SQLite with `projects` table
 - [ ] GoReleaser shipping `forge` + `forge-proxy` together
 
 **Done when:** `forge --version` installs as one binary on Fedora; `forge add .` and `forge list` work.
