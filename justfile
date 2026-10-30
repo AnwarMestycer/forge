@@ -15,7 +15,7 @@ test:
     cd proxy && cargo test
 
 lint:
-    go vet ./...
+    golangci-lint run
     cd proxy && cargo clippy -- -D warnings
 
 run-testbed:
