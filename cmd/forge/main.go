@@ -1,17 +1,16 @@
 package main
 
 import (
-	"fmt"
 	"os"
+
+	"github.com/AnwarMestycer/forge/internal/cli"
 )
 
+// version is set at build time: -ldflags "-X main.version=1.2.3".
 var version = "0.0.0-dev"
 
 func main() {
-	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "version") {
-		fmt.Println("forge", version)
-		return
+	if err := cli.NewRootCmd(version).Execute(); err != nil {
+		os.Exit(1)
 	}
-	fmt.Println("forge — build → verify → break → learn")
-	fmt.Println("Early development. See ROADMAP.md.")
 }
