@@ -11,7 +11,7 @@ Pace: ~8–10 h/week, part-time. Two tracks run in parallel (Go on weekdays, Rus
 |---|---|---|---|---|
 | M0 | Foundations | Go + Rust | 1 | 🟡 In progress |
 | Spike | Rust TCP proxy spike | Rust | 1 | 🟢 Done |
-| Testbed | Sample NestJS + Postgres app | — | 1 | ⚪ Not started |
+| Testbed | Sample NestJS + Postgres app | — | 1 | 🟢 Done |
 | M1 | Forge core | Go | 2–3 | ⚪ Not started |
 | M2 | Vouch v1 (rules) | Go | 4–5 | ⚪ Not started |
 | M3a | Fault proxy: TCP | Rust | 3–6 | ⚪ Not started |
@@ -46,9 +46,9 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 **Done when:** real Postgres traffic flows through Rust and you can feel the latency.
 
 ## Testbed
-- [ ] `testbed/docker-compose.yml`: Postgres + minimal NestJS API
-- [ ] One `users` table, one auth endpoint (JWT), one migration, RLS-style policy
-- [ ] API can run through the proxy
+- [x] `testbed/docker-compose.yml`: Postgres + minimal NestJS API
+- [x] One `users` table, one auth endpoint (JWT), one migration, RLS-style policy
+- [x] API can run through the proxy
 
 **Done when:** `just run-testbed` brings it up and it talks to Postgres through the spike proxy.
 
@@ -123,6 +123,9 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 2026-10-29 | Go ↔ Rust contract: HTTP + JSON over Unix socket, versioned `/v1`, schema in `api/schema.json` |
 | 2026-10-29 | Monorepo; in-repo testbed app for reproducible Vouch/Chaos tests |
 | 2026-10-29 | Testbed in NestJS (closest to real client work) — *default, revisit if it slows things down* |
+| 2026-10-30 | Testbed runs api → forge-proxy → Postgres all in compose |
+| 2026-10-30 | Docker is the default engine (`just` uses `docker compose`; `FORGE_COMPOSE="podman compose"` to override). Go code talks the Docker Engine API so Podman's compatible socket still works |
+| 2026-10-30 | Testbed migrations are plain SQL `NNN_name.up.sql` / `.down.sql` + a tiny runner; API uses a non-superuser `app` role so RLS applies |
 
 ## Rules
 - **Dogfood from M1.** If you don't use it daily, fix that first.
