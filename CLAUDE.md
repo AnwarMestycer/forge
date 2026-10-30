@@ -54,7 +54,7 @@ cd proxy && cargo run -- 127.0.0.1:6544 127.0.0.1:5432 200   # spike proxy
 
 ## Current state
 - M0: repo scaffold done; cobra commands, SQLite, GoReleaser still to do.
-- Spike: Rust TCP proxy with fixed latency written (`proxy/src/main.rs`); still needs to be verified against real Postgres via `psql -p 6544`.
+- Spike: done — Rust TCP proxy with fixed latency (`proxy/src/main.rs`) verified against real Postgres: `select 1` takes ~2 s via `psql -p 6544` vs ~26 ms direct.
 - Recommended order: finish Spike → Testbed → rest of M0 → M1. M3 (fault proxy) is the riskiest part of the critical path — start it early.
 
 ## Conventions
