@@ -35,6 +35,16 @@ forge-proxy (Rust)
 | `scenarios/` | Chaos scenarios |
 | `testbed/` | Sample NestJS + Postgres app used to test everything |
 
+## Install
+
+Download a release from GitHub Releases:
+
+- **Fedora / RHEL:** `sudo dnf install ./forge_<version>_linux_amd64.rpm`
+- **Debian / Ubuntu:** `sudo apt install ./forge_<version>_linux_amd64.deb`
+- **Other:** extract the `.tar.gz` and keep `forge` and `forge-proxy` in the same directory.
+
+From source: `go install ./cmd/forge` (CLI only; the proxy is built with `cargo build --release` in `proxy/`).
+
 ## Status
 
 Early development. See [ROADMAP.md](ROADMAP.md) for milestones and progress.

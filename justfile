@@ -18,6 +18,10 @@ lint:
     golangci-lint run
     cd proxy && cargo clippy -- -D warnings
 
+# Local release dry run (both binaries, tarballs, rpm/deb) into dist/
+snapshot:
+    goreleaser release --snapshot --clean
+
 run-testbed:
     {{compose}} -f testbed/docker-compose.yml up -d --build
 

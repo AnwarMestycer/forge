@@ -1,0 +1,60 @@
+# Release: forge (Go) + forge-proxy (Rust) shipped together.
+#   Local dry run:  goreleaser release --snapshot --clean
+#   Real release:   push a v* tag (see .github/workflows/release.yml)
+# Needs: go, rust (rustup targets below), zig + cargo-zigbuild for cross builds.
+version: 2
+project_name: forge
+
+builds:
+  - id: forge
+    builder: go
+    main: ./cmd/forge
+    binary: forge
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+  - id: forge-proxy
+    builder: rust
+    dir: proxy
+    binary: forge-proxy
+    targets:
+      - x86_64-unknown-linux-gnu
+      - aarch64-unknown-linux-gnu
+      - x86_64-apple-darwin
+      - aarch64-apple-darwin
+
+archives:
+  - id: forge
+    ids: [forge, forge-proxy]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+
+# Linux packages: `forge` on PATH, `forge-proxy` as a private helper in libexec
+# (forge starts it; users never call it directly).
+nfpms:
+  - id: packages
+    ids: [forge]
+    package_name: forge
+    homepage: https://github.com/AnwarMestycer/forge
+    maintainer: Anwar Mestycer <anwarmestycer1@gmail.com>
+    description: "Developer command center: build → verify → break → learn."
+    formats: [rpm, deb]
+    bindir: /usr/bin
+    contents:
+      # Rust artifacts are named by target triple; map from the package arch.
+      - src: 'dist/forge-proxy_{{ if eq .Arch "amd64" }}x86_64{{ else }}aarch64{{ end }}-unknown-linux-gnu/forge-proxy'
+        dst: /usr/libexec/forge/forge-proxy
+        file_info:
+          mode: 0755
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc

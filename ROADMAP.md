@@ -9,7 +9,7 @@ Pace: ~8–10 h/week, part-time. Two tracks run in parallel (Go on weekdays, Rus
 
 | # | Milestone | Track | Weeks | Status |
 |---|---|---|---|---|
-| M0 | Foundations | Go + Rust | 1 | 🟡 In progress |
+| M0 | Foundations | Go + Rust | 1 | 🟢 Done |
 | Spike | Rust TCP proxy spike | Rust | 1 | 🟢 Done |
 | Testbed | Sample NestJS + Postgres app | — | 1 | 🟢 Done |
 | M1 | Forge core | Go | 2–3 | ⚪ Not started |
@@ -34,9 +34,9 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 - [x] CI: Go build/test/`golangci-lint`, Rust build/test/`clippy`
 - [x] cobra root with stub commands: `add`, `list`, `switch`, `context`, `vouch`, `chaos`
 - [x] `~/.forge/` config + SQLite with `projects` table
-- [ ] GoReleaser shipping `forge` + `forge-proxy` together
+- [x] GoReleaser shipping `forge` + `forge-proxy` together
 
-**Done when:** `forge --version` installs as one binary on Fedora; `forge add .` and `forge list` work.
+**Done when:** one package (`sudo dnf install ./forge_*.rpm`) installs `forge` (+ `forge-proxy` as a private helper) on Fedora; `forge --version`, `forge add .` and `forge list` work.
 
 ## Spike — Rust TCP proxy (week 1)
 - [x] `tokio` proxy: listen `:6544` → forward to Postgres `:5432`
@@ -125,6 +125,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 2026-10-29 | Testbed in NestJS (closest to real client work) — *default, revisit if it slows things down* |
 | 2026-10-30 | Testbed runs api → forge-proxy → Postgres all in compose |
 | 2026-10-30 | Docker is the default engine (`just` uses `docker compose`; `FORGE_COMPOSE="podman compose"` to override). Go code talks the Docker Engine API so Podman's compatible socket still works |
+| 2026-10-30 | Ship `forge` + `forge-proxy` as one package (not embedded): `forge` in `/usr/bin`, proxy in `/usr/libexec/forge/` (tarball: side by side). M3 lookup order: `$FORGE_PROXY`, next to `forge`, `../libexec/forge/`, PATH; plus a `/v1` version handshake. Single-file embedding can be layered on later |
 | 2026-10-30 | Testbed migrations are plain SQL `NNN_name.up.sql` / `.down.sql` + a tiny runner; API uses a non-superuser `app` role so RLS applies |
 
 ## Rules

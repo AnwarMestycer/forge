@@ -44,6 +44,7 @@ forge (Go CLI / TUI)            forge-proxy (Rust)
 go build -o bin/forge ./cmd/forge && go test ./... && golangci-lint run
 cd proxy && cargo build && cargo test && cargo clippy -- -D warnings
 cd proxy && cargo run -- 127.0.0.1:6544 127.0.0.1:5432 200   # spike proxy
+just snapshot                                                 # local release dry run → dist/
 just run-testbed / just stop-testbed                          # testbed (PROXY_DELAY_MS=50 default)
 ```
 (`justfile` wraps these: `just build`, `just test`, `just lint`, `just run-testbed`.)
@@ -54,7 +55,7 @@ just run-testbed / just stop-testbed                          # testbed (PROXY_D
 - Record any architectural decision in the **Decisions log** table at the bottom of ROADMAP.md, with the date.
 
 ## Current state
-- M0: scaffold, `justfile` and CI (with golangci-lint) done; cobra commands, SQLite, GoReleaser still to do.
+- M0: done — cobra CLI (`internal/cli`), `~/.forge` config (`internal/config`, `$FORGE_HOME` overrides), SQLite store (`internal/store`, migrations via `PRAGMA user_version`), `forge add`/`forge list`, GoReleaser (`.goreleaser.yaml`: tarballs + rpm/deb; release on `v*` tag). Homebrew tap and macOS signing not set up yet.
 - Spike: done — Rust TCP proxy with fixed latency (`proxy/src/main.rs`) verified against real Postgres: `select 1` takes ~2 s via `psql -p 6544` vs ~26 ms direct.
 - Testbed: done — `just run-testbed` brings up `testbed/` (NestJS API on :3000 → forge-proxy :6544 → Postgres :5432). Endpoints: `POST /auth/signup`, `POST /auth/login` (JWT), `GET /users/me` (RLS-scoped), `GET /health`. `just stop-testbed` tears it down.
 - Recommended order: rest of M0 → M1. M3 (fault proxy) is the riskiest part of the critical path — start it early.
