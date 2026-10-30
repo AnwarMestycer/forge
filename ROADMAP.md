@@ -30,8 +30,8 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 
 ## M0 — Foundations
 - [x] Monorepo layout (Go module + Rust crate)
-- [ ] `justfile`: `build`, `test`, `lint`, `run-testbed`
-- [ ] CI: Go build/test/`golangci-lint`, Rust build/test/`clippy`
+- [x] `justfile`: `build`, `test`, `lint`, `run-testbed`
+- [x] CI: Go build/test/`golangci-lint`, Rust build/test/`clippy`
 - [ ] cobra root with stub commands: `add`, `list`, `switch`, `context`, `vouch`, `chaos`
 - [ ] `~/.forge/` config + SQLite with `projects` table
 - [ ] GoReleaser shipping `forge` + `forge-proxy` together

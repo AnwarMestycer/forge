@@ -15,7 +15,9 @@ jobs:
           go-version-file: go.mod
       - run: go build ./...
       - run: go test ./...
-      - run: go vet ./...
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15
 
   rust:
     runs-on: ubuntu-latest
