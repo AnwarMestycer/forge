@@ -35,7 +35,8 @@ func newAddCmd() *cobra.Command {
 
 forge detects the stack (from package.json, pubspec.yaml, go.mod, Cargo.toml,
 supabase/config.toml — in the root and one level down), the Docker Compose file
-and a .env file. Flags override detection; --compose and --env are relative to
+and a .env file. Running add again on a registered project re-detects and
+updates it (the name is kept unless --name is given). Flags override detection; --compose and --env are relative to
 the project directory. Only the env file's path is stored, never its contents.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -47,14 +48,10 @@ the project directory. Only the env file's path is stored, never its contents.`,
 			if err != nil {
 				return err
 			}
-			if name == "" {
-				name = filepath.Base(path)
-			}
 			p, err := describeProject(path, stack, compose, env)
 			if err != nil {
 				return err
 			}
-			p.Name = name
 
 			s, err := openStore(cmd)
 			if err != nil {
@@ -62,15 +59,25 @@ the project directory. Only the env file's path is stored, never its contents.`,
 			}
 			defer func() { _ = s.Close() }()
 
-			p, err = s.AddProject(cmd.Context(), p)
+			// Re-running add on a registered project refreshes it (re-detects;
+			// keeps the name unless --name is given).
+			verb := "added"
+			p.Name = name
+			if p.Name == "" {
+				p.Name = filepath.Base(path)
+			}
+			added, err := s.AddProject(cmd.Context(), p)
 			if errors.Is(err, store.ErrProjectExists) {
-				return fmt.Errorf("%s is already registered (see `forge list`)", path)
+				verb = "updated"
+				p.Name = name
+				added, err = s.UpdateProject(cmd.Context(), p)
 			}
 			if err != nil {
 				return err
 			}
+			p = added
 			out := cmd.OutOrStdout()
-			_, _ = fmt.Fprintf(out, "added %s (%s)\n", p.Name, p.Path)
+			_, _ = fmt.Fprintf(out, "%s %s (%s)\n", verb, p.Name, p.Path)
 			_, _ = fmt.Fprintf(out, "  stack:   %s\n", orNone(strings.Join(p.Stack, ", ")))
 			_, _ = fmt.Fprintf(out, "  compose: %s\n", orNone(p.ComposeFile))
 			_, err = fmt.Fprintf(out, "  env:     %s\n", orNone(p.EnvFile))

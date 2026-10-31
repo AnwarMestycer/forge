@@ -54,12 +54,16 @@ func TestAddAndList(t *testing.T) {
 	if out, err = run(t, "add", project, "--name", "demo"); err != nil {
 		t.Fatalf("add: %v %q", err, out)
 	}
-	if _, err = run(t, "add", project); err == nil {
-		t.Fatal("adding the same path twice should fail")
+	// Re-adding refreshes in place: no duplicate, name kept without --name.
+	if out, err = run(t, "add", project); err != nil || !strings.HasPrefix(out, "updated demo ") {
+		t.Fatalf("re-add: %v %q", err, out)
+	}
+	if out, err = run(t, "add", project, "--name", "renamed"); err != nil || !strings.HasPrefix(out, "updated renamed ") {
+		t.Fatalf("re-add with --name: %v %q", err, out)
 	}
 
 	out, err = run(t, "list")
-	if err != nil || !strings.Contains(out, "demo") || !strings.Contains(out, project) {
+	if err != nil || !strings.Contains(out, "renamed") || strings.Count(out, project) != 1 {
 		t.Fatalf("list: %v %q", err, out)
 	}
 }

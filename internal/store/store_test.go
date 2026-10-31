@@ -133,3 +133,27 @@ func TestMigrateFromV1(t *testing.T) {
 		t.Fatalf("user_version = %d, %v", v, err)
 	}
 }
+
+func TestUpdateProject(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+
+	orig, err := s.AddProject(ctx, Project{Name: "api", Path: "/work/api", Stack: []string{"node"}, EnvFile: ".env"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.UpdateProject(ctx, Project{Path: "/work/api", Stack: []string{"nestjs"}, ComposeFile: "compose.yaml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != orig.ID || got.Name != "api" || !slices.Equal(got.Stack, []string{"nestjs"}) ||
+		got.ComposeFile != "compose.yaml" || got.EnvFile != "" || !got.CreatedAt.Equal(orig.CreatedAt) {
+		t.Fatalf("update kept/changed the wrong fields: %+v", got)
+	}
+	if got, err = s.UpdateProject(ctx, Project{Name: "renamed", Path: "/work/api"}); err != nil || got.Name != "renamed" {
+		t.Fatalf("rename: %v %+v", err, got)
+	}
+	if _, err := s.UpdateProject(ctx, Project{Path: "/nope"}); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("missing path: want sql.ErrNoRows, got %v", err)
+	}
+}

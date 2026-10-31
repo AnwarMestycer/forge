@@ -116,6 +116,33 @@ func (s *Store) AddProject(ctx context.Context, p Project) (Project, error) {
 	return p, nil
 }
 
+// UpdateProject updates the project registered at p.Path with p's stack,
+// compose file and env file, and its name if p.Name is non-empty. It returns
+// the stored project, or sql.ErrNoRows if no project has that path.
+func (s *Store) UpdateProject(ctx context.Context, p Project) (Project, error) {
+	var created string
+	var stack string
+	err := s.db.QueryRowContext(ctx,
+		`update projects set
+		   name = coalesce(nullif(?, ''), name),
+		   stack = ?, compose_file = ?, env_file = ?
+		 where path = ?
+		 returning id, name, stack, created_at`,
+		p.Name, strings.Join(p.Stack, ","), p.ComposeFile, p.EnvFile, p.Path,
+	).Scan(&p.ID, &p.Name, &stack, &created)
+	if err != nil {
+		return Project{}, err
+	}
+	p.Stack = nil
+	if stack != "" {
+		p.Stack = strings.Split(stack, ",")
+	}
+	if p.CreatedAt, err = time.Parse(time.RFC3339, created); err != nil {
+		return Project{}, fmt.Errorf("project %d: bad created_at %q: %w", p.ID, created, err)
+	}
+	return p, nil
+}
+
 // ListProjects returns all projects, oldest first.
 func (s *Store) ListProjects(ctx context.Context) ([]Project, error) {
 	rows, err := s.db.QueryContext(ctx, `select id, name, path, stack, compose_file, env_file, created_at
