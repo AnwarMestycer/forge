@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -59,5 +61,53 @@ func TestAddAndList(t *testing.T) {
 	out, err = run(t, "list")
 	if err != nil || !strings.Contains(out, "demo") || !strings.Contains(out, project) {
 		t.Fatalf("list: %v %q", err, out)
+	}
+}
+
+func TestAddDetectsAndOverrides(t *testing.T) {
+	t.Setenv("FORGE_HOME", t.TempDir())
+	project := t.TempDir()
+	for name, body := range map[string]string{
+		"package.json":        `{"dependencies":{"@nestjs/core":"11"}}`,
+		"docker-compose.yml":  "",
+		".env":                "SECRET=hunter2",
+		"deploy/compose.prod": "",
+	} {
+		p := filepath.Join(project, name)
+		_ = os.MkdirAll(filepath.Dir(p), 0o755)
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	out, err := run(t, "add", project)
+	if err != nil {
+		t.Fatalf("add: %v %q", err, out)
+	}
+	for _, want := range []string{"stack:   nestjs", "compose: docker-compose.yml", "env:     .env"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("add output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "hunter2") {
+		t.Fatal("env contents must never be printed")
+	}
+
+	other := t.TempDir()
+	if err := os.WriteFile(filepath.Join(other, "c.yml"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err = run(t, "add", other, "--stack", "Flutter, supabase,flutter", "--compose", "c.yml")
+	if err != nil || !strings.Contains(out, "stack:   flutter, supabase") || !strings.Contains(out, "compose: c.yml") {
+		t.Fatalf("overrides: %v\n%s", err, out)
+	}
+
+	if _, err := run(t, "add", t.TempDir(), "--env", "nope.env"); err == nil {
+		t.Fatal("--env pointing at a missing file should fail")
+	}
+
+	out, err = run(t, "list")
+	if err != nil || !strings.Contains(out, "STACK") || !strings.Contains(out, "nestjs") || !strings.Contains(out, "flutter,supabase") {
+		t.Fatalf("list: %v\n%s", err, out)
 	}
 }

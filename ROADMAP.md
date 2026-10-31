@@ -12,7 +12,7 @@ Pace: ~8–10 h/week, part-time. Two tracks run in parallel (Go on weekdays, Rus
 | M0 | Foundations | Go + Rust | 1 | 🟢 Done |
 | Spike | Rust TCP proxy spike | Rust | 1 | 🟢 Done |
 | Testbed | Sample NestJS + Postgres app | — | 1 | 🟢 Done |
-| M1 | Forge core | Go | 2–3 | ⚪ Not started |
+| M1 | Forge core | Go | 2–3 | 🟡 In progress |
 | M2 | Vouch v1 (rules) | Go | 4–5 | ⚪ Not started |
 | M3a | Fault proxy: TCP | Rust | 3–6 | ⚪ Not started |
 | M3b | Fault proxy: Postgres-aware | Rust | 7–8 | ⚪ Not started |
@@ -53,7 +53,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 **Done when:** `just run-testbed` brings it up and it talks to Postgres through the spike proxy.
 
 ## M1 — Forge core (Go)
-- [ ] `forge add` registers a project (path, stack, compose file, env)
+- [x] `forge add` registers a project (path, stack, compose file, env)
 - [ ] `forge switch <name>`: start containers, load env, print "where you left off"
 - [ ] `forge context sync` generates `CLAUDE.md` from stack, structure, git history
 
@@ -127,6 +127,8 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 2026-10-30 | Docker is the default engine (`just` uses `docker compose`; `FORGE_COMPOSE="podman compose"` to override). Go code talks the Docker Engine API so Podman's compatible socket still works |
 | 2026-10-30 | Ship `forge` + `forge-proxy` as one package (not embedded): `forge` in `/usr/bin`, proxy in `/usr/libexec/forge/` (tarball: side by side). M3 lookup order: `$FORGE_PROXY`, next to `forge`, `../libexec/forge/`, PATH; plus a `/v1` version handshake. Single-file embedding can be layered on later |
 | 2026-10-30 | Testbed migrations are plain SQL `NNN_name.up.sql` / `.down.sql` + a tiny runner; API uses a non-superuser `app` role so RLS applies |
+| 2026-10-31 | `forge add` stores the env file *path*, never its contents — secrets stay out of `forge.db`; `forge switch` reads the file at run time |
+| 2026-10-31 | Stack is auto-detected from marker files in the project root + one level down (monorepos); `--stack/--compose/--env` override |
 
 ## Rules
 - **Dogfood from M1.** If you don't use it daily, fix that first.
