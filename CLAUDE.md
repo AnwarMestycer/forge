@@ -4,7 +4,7 @@
 `forge` is a developer command center that runs one loop: **build → verify → break → learn**.
 Pitch: *Ship AI-written code with proof, not hope.*
 
-- **Build (core):** scaffold projects from reusable blocks, `forge switch` between projects, keep per-project `CLAUDE.md` in sync.
+- **Build (core):** scaffold projects from reusable blocks, `forge switch` between projects, keep per-project agent context (`AGENTS.md`, `CLAUDE.md`) in sync.
 - **Verify (`forge vouch`):** read a diff and produce a risk report (auth/RLS, migrations without rollback, new env vars, deleted tests, new deps) + "the 3 places you must read".
 - **Break (`forge chaos`):** run the app behind a fault-injecting proxy (slow DB, dropped requests, expired JWTs, killed containers).
 - **Learn:** what broke and how it was fixed is written back into project context.

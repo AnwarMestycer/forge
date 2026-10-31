@@ -55,7 +55,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 ## M1 — Forge core (Go)
 - [x] `forge add` registers a project (path, stack, compose file, env)
 - [x] `forge switch <name>`: start containers, load env, print "where you left off"
-- [ ] `forge context sync` generates `CLAUDE.md` from stack, structure, git history
+- [x] `forge context sync` generates agent context (`AGENTS.md` + `CLAUDE.md` importing it) from stack, structure, git history
 
 **Done when:** you use `forge switch` daily on 2 real projects.
 
@@ -129,6 +129,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 2026-10-30 | Testbed migrations are plain SQL `NNN_name.up.sql` / `.down.sql` + a tiny runner; API uses a non-superuser `app` role so RLS applies |
 | 2026-10-31 | `forge add` stores the env file *path*, never its contents — secrets stay out of `forge.db`; `forge switch` reads the file at run time |
 | 2026-10-31 | `forge switch` opens a subshell (project dir + env, `$FORGE_PROJECT` set) — a child process can't change its parent shell's cwd/env. An `eval`-able shell hook can come later |
+| 2026-10-31 | Agent context is tool-neutral: one set of facts rendered into `AGENTS.md` (the cross-tool standard), and `CLAUDE.md` gets a managed block that imports it (`@AGENTS.md` — Claude Code reads only CLAUDE.md when one exists). forge edits only between `<!-- forge:begin/end -->` markers; output is deterministic so re-sync is a no-op. More targets (gemini, copilot, cursor) are small additions |
 | 2026-10-31 | `forge switch` shells out to `docker compose` (`$FORGE_COMPOSE` overrides) and `git` instead of the Docker SDK / go-git: compose has no Engine-API equivalent, and the git CLI is faster and matches what the user sees. Engine SDK stays the plan for chaos (M4) |
 | 2026-10-31 | Stack is auto-detected from marker files in the project root + one level down (monorepos); `--stack/--compose/--env` override |
 

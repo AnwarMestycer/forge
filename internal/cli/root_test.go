@@ -31,7 +31,7 @@ func TestVersion(t *testing.T) {
 }
 
 func TestStubCommandsExist(t *testing.T) {
-	for _, name := range []string{"context", "vouch", "chaos"} {
+	for _, name := range []string{"vouch", "chaos"} {
 		out, err := run(t, name)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)

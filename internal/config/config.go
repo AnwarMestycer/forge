@@ -12,12 +12,16 @@ import (
 
 // Config is forge's user configuration.
 type Config struct {
-	Home   string // ~/.forge, or $FORGE_HOME
-	DBPath string // SQLite database, default <Home>/forge.db
+	Home           string   // ~/.forge, or $FORGE_HOME
+	DBPath         string   // SQLite database, default <Home>/forge.db
+	ContextTargets []string // `forge context sync` targets; empty = auto
 }
 
 const defaultConfig = `# forge configuration — https://github.com/AnwarMestycer/forge
 # db_path: /absolute/path/to/forge.db   # default: forge.db next to this file
+# context:
+#   targets: [agents, claude]   # files "forge context sync" writes: agents (AGENTS.md), claude (CLAUDE.md)
+#                               # default: AGENTS.md, plus CLAUDE.md if the project already has one
 `
 
 // Home returns forge's home directory: $FORGE_HOME if set, else ~/.forge.
@@ -59,5 +63,9 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 
-	return &Config{Home: home, DBPath: v.GetString("db_path")}, nil
+	return &Config{
+		Home:           home,
+		DBPath:         v.GetString("db_path"),
+		ContextTargets: v.GetStringSlice("context.targets"),
+	}, nil
 }

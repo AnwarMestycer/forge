@@ -22,7 +22,7 @@ func NewRootCmd(version string) *cobra.Command {
 		newAddCmd(),
 		newListCmd(),
 		newSwitchCmd(),
-		stubCmd("context", "Show or sync the current project's CLAUDE.md context"),
+		newContextCmd(),
 		stubCmd("vouch", "Risk report for the current diff (auth/RLS, migrations, env, tests, deps)"),
 		stubCmd("chaos", "Run the app behind the fault-injecting proxy"),
 	)

@@ -98,7 +98,7 @@ Compose runs as "docker compose"; set FORGE_COMPOSE="podman compose" to change i
 // a path separator or is "." / "..".
 func findProject(cmd *cobra.Command, s *store.Store, arg string) (store.Project, error) {
 	ctx := cmd.Context()
-	if arg == "." || arg == ".." || strings.ContainsRune(arg, os.PathSeparator) {
+	if isPathArg(arg) {
 		path, err := projectPath(arg)
 		if err != nil {
 			return store.Project{}, err
@@ -131,6 +131,11 @@ func findProject(cmd *cobra.Command, s *store.Store, arg string) (store.Project,
 		fmt.Fprintf(&b, "\n  %s", p.Path)
 	}
 	return store.Project{}, errors.New(b.String())
+}
+
+// isPathArg reports whether a project argument is a path rather than a name.
+func isPathArg(arg string) bool {
+	return arg == "." || arg == ".." || strings.ContainsRune(arg, os.PathSeparator)
 }
 
 // printLeftOff prints the "where you left off" block.
