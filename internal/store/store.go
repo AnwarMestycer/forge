@@ -31,6 +31,8 @@ var migrations = []string{
 	`alter table projects add column stack text not null default '';
 	 alter table projects add column compose_file text not null default '';
 	 alter table projects add column env_file text not null default ''`,
+	// M1: when `forge switch` last entered the project ('' = never).
+	`alter table projects add column last_switched_at text not null default ''`,
 }
 
 // Store wraps the forge database.
@@ -47,6 +49,7 @@ type Project struct {
 	ComposeFile string   // relative to Path; "" if none
 	EnvFile     string   // relative to Path; "" if none
 	CreatedAt   time.Time
+	SwitchedAt  time.Time // last `forge switch`; zero if never
 }
 
 // Open opens (creating if needed) the database at path and applies pending migrations.
@@ -143,10 +146,28 @@ func (s *Store) UpdateProject(ctx context.Context, p Project) (Project, error) {
 	return p, nil
 }
 
+const projectCols = `id, name, path, stack, compose_file, env_file, created_at, last_switched_at`
+
 // ListProjects returns all projects, oldest first.
 func (s *Store) ListProjects(ctx context.Context) ([]Project, error) {
-	rows, err := s.db.QueryContext(ctx, `select id, name, path, stack, compose_file, env_file, created_at
-		 from projects order by id`)
+	return s.queryProjects(ctx, `select `+projectCols+` from projects order by id`)
+}
+
+// ProjectsByName returns the projects called name (names are not unique;
+// callers decide what to do with more than one).
+func (s *Store) ProjectsByName(ctx context.Context, name string) ([]Project, error) {
+	return s.queryProjects(ctx, `select `+projectCols+` from projects where name = ? order by id`, name)
+}
+
+// MarkSwitched records that project id was switched to at t.
+func (s *Store) MarkSwitched(ctx context.Context, id int64, t time.Time) error {
+	_, err := s.db.ExecContext(ctx, "update projects set last_switched_at = ? where id = ?",
+		t.UTC().Truncate(time.Second).Format(time.RFC3339), id)
+	return err
+}
+
+func (s *Store) queryProjects(ctx context.Context, query string, args ...any) ([]Project, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -155,8 +176,8 @@ func (s *Store) ListProjects(ctx context.Context) ([]Project, error) {
 	var projects []Project
 	for rows.Next() {
 		var p Project
-		var stack, created string
-		if err := rows.Scan(&p.ID, &p.Name, &p.Path, &stack, &p.ComposeFile, &p.EnvFile, &created); err != nil {
+		var stack, created, switched string
+		if err := rows.Scan(&p.ID, &p.Name, &p.Path, &stack, &p.ComposeFile, &p.EnvFile, &created, &switched); err != nil {
 			return nil, err
 		}
 		if stack != "" {
@@ -164,6 +185,11 @@ func (s *Store) ListProjects(ctx context.Context) ([]Project, error) {
 		}
 		if p.CreatedAt, err = time.Parse(time.RFC3339, created); err != nil {
 			return nil, fmt.Errorf("project %d: bad created_at %q: %w", p.ID, created, err)
+		}
+		if switched != "" {
+			if p.SwitchedAt, err = time.Parse(time.RFC3339, switched); err != nil {
+				return nil, fmt.Errorf("project %d: bad last_switched_at %q: %w", p.ID, switched, err)
+			}
 		}
 		projects = append(projects, p)
 	}

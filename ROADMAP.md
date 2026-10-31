@@ -54,7 +54,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 
 ## M1 — Forge core (Go)
 - [x] `forge add` registers a project (path, stack, compose file, env)
-- [ ] `forge switch <name>`: start containers, load env, print "where you left off"
+- [x] `forge switch <name>`: start containers, load env, print "where you left off"
 - [ ] `forge context sync` generates `CLAUDE.md` from stack, structure, git history
 
 **Done when:** you use `forge switch` daily on 2 real projects.
@@ -128,6 +128,8 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 2026-10-30 | Ship `forge` + `forge-proxy` as one package (not embedded): `forge` in `/usr/bin`, proxy in `/usr/libexec/forge/` (tarball: side by side). M3 lookup order: `$FORGE_PROXY`, next to `forge`, `../libexec/forge/`, PATH; plus a `/v1` version handshake. Single-file embedding can be layered on later |
 | 2026-10-30 | Testbed migrations are plain SQL `NNN_name.up.sql` / `.down.sql` + a tiny runner; API uses a non-superuser `app` role so RLS applies |
 | 2026-10-31 | `forge add` stores the env file *path*, never its contents — secrets stay out of `forge.db`; `forge switch` reads the file at run time |
+| 2026-10-31 | `forge switch` opens a subshell (project dir + env, `$FORGE_PROJECT` set) — a child process can't change its parent shell's cwd/env. An `eval`-able shell hook can come later |
+| 2026-10-31 | `forge switch` shells out to `docker compose` (`$FORGE_COMPOSE` overrides) and `git` instead of the Docker SDK / go-git: compose has no Engine-API equivalent, and the git CLI is faster and matches what the user sees. Engine SDK stays the plan for chaos (M4) |
 | 2026-10-31 | Stack is auto-detected from marker files in the project root + one level down (monorepos); `--stack/--compose/--env` override |
 
 ## Rules

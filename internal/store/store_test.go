@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 )
 
 func open(t *testing.T) *Store {
@@ -155,5 +156,31 @@ func TestUpdateProject(t *testing.T) {
 	}
 	if _, err := s.UpdateProject(ctx, Project{Path: "/nope"}); !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("missing path: want sql.ErrNoRows, got %v", err)
+	}
+}
+
+func TestProjectsByNameAndMarkSwitched(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+
+	a, _ := s.AddProject(ctx, Project{Name: "api", Path: "/work/a/api"})
+	if _, err := s.AddProject(ctx, Project{Name: "api", Path: "/work/b/api"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.ProjectsByName(ctx, "api")
+	if err != nil || len(got) != 2 || !got[0].SwitchedAt.IsZero() {
+		t.Fatalf("by name: %v %+v", err, got)
+	}
+	if got, _ := s.ProjectsByName(ctx, "nope"); len(got) != 0 {
+		t.Fatalf("unknown name: %+v", got)
+	}
+
+	when := time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC)
+	if err := s.MarkSwitched(ctx, a.ID, when); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = s.ProjectsByName(ctx, "api")
+	if !got[0].SwitchedAt.Equal(when) || !got[1].SwitchedAt.IsZero() {
+		t.Fatalf("switched_at: %+v", got)
 	}
 }
