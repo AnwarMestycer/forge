@@ -56,5 +56,11 @@ nfpms:
 checksum:
   name_template: checksums.txt
 
+# Snapshot versions must increase over time so rpm/deb upgrades work: a bare
+# commit hash compares randomly (rpm ranks digit-led segments above letter-led
+# ones). `~` makes a dev build sort *below* the release it leads up to.
+snapshot:
+  version_template: '{{ incpatch .Version }}~dev{{ .Now.Format "20060102150405" }}'
+
 changelog:
   sort: asc
