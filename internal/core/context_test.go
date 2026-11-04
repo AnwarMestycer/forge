@@ -40,6 +40,40 @@ func TestUpsertSection(t *testing.T) {
 			t.Fatalf("second run changed the file:\n%q\n%q", once, twice)
 		}
 	})
+	t.Run("markers mentioned in text are not markers", func(t *testing.T) {
+		mine := "Sync owns the `<!-- forge:begin/end -->` block.\n" +
+			"Inline: `" + BeginMarker + "` and `" + EndMarker + "`.\n" +
+			"<!-- forge:begin/end -->\n" +
+			"<!-- forge:beginning -->\n" +
+			"  " + EndMarker + "\n"
+		once, err := UpsertSection(mine, "app", "facts")
+		if err != nil || once != mine+"\n"+block("facts") {
+			t.Fatalf("%q %v", once, err)
+		}
+		twice, err := UpsertSection(once, "app", "new facts")
+		if err != nil || twice != mine+"\n"+block("new facts") {
+			t.Fatalf("%q %v", twice, err)
+		}
+	})
+	t.Run("marker lines tolerate CRLF and trailing spaces", func(t *testing.T) {
+		in := "mine\r\n" + BeginMarker + "\r\nold\r\n" + EndMarker + "  \r\nmore\r\n"
+		got, err := UpsertSection(in, "app", "facts")
+		if err != nil || got != "mine\r\n"+block("facts")+"more\r\n" {
+			t.Fatalf("%q %v", got, err)
+		}
+	})
+	t.Run("end marker at end of file without newline", func(t *testing.T) {
+		got, err := UpsertSection("mine\n"+BeginMarker+"\nold\n"+EndMarker, "app", "facts")
+		if err != nil || got != "mine\n"+block("facts") {
+			t.Fatalf("%q %v", got, err)
+		}
+	})
+	t.Run("a shorter begin notice is still the begin marker", func(t *testing.T) {
+		got, err := UpsertSection("<!-- forge:begin -->\nold\n"+EndMarker+"\n", "app", "facts")
+		if err != nil || got != block("facts") {
+			t.Fatalf("%q %v", got, err)
+		}
+	})
 	for name, in := range map[string]string{
 		"begin without end": "x\n" + BeginMarker + "\nfacts\n",
 		"end without begin": "x\n" + EndMarker + "\n",
@@ -151,6 +185,50 @@ func TestSyncContext(t *testing.T) {
 	if err != nil || !strings.Contains(res[0].Content, "**Stack:** go") || strings.Contains(res[0].Content, "@AGENTS.md") {
 		t.Fatalf("claude-only: %v\n%s", err, res[0].Content)
 	}
+}
+
+func TestSyncContextWritesNothingWhenAnyTargetFails(t *testing.T) {
+	for name, breaks := range map[string]string{
+		"later target is bad":   "CLAUDE.md",
+		"earlier target is bad": "AGENTS.md",
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			bad := "x\n" + BeginMarker + "\nno end marker\n"
+			good := "# Mine\n"
+			files := map[string]string{"AGENTS.md": good, "CLAUDE.md": good}
+			files[breaks] = bad
+			for file, content := range files {
+				if err := os.WriteFile(filepath.Join(root, file), []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			_, err := SyncContext(root, Facts{Name: "app"}, []string{"agents", "claude"}, true)
+			if !errors.Is(err, ErrMalformedMarkers) || !strings.Contains(err.Error(), breaks) {
+				t.Fatalf("want ErrMalformedMarkers naming %s, got %v", breaks, err)
+			}
+			for file, content := range files {
+				got, _ := os.ReadFile(filepath.Join(root, file))
+				if string(got) != content {
+					t.Errorf("%s was changed by a failed sync:\n%s", file, got)
+				}
+			}
+		})
+	}
+
+	t.Run("missing file is not created when another target is bad", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte(BeginMarker+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := SyncContext(root, Facts{Name: "app"}, []string{"agents", "claude"}, true); err == nil {
+			t.Fatal("want an error")
+		}
+		if _, err := os.Stat(filepath.Join(root, "AGENTS.md")); err == nil {
+			t.Fatal("AGENTS.md was created by a failed sync")
+		}
+	})
 }
 
 func TestNormalizeTargets(t *testing.T) {

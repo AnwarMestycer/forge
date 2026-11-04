@@ -223,26 +223,46 @@ var ErrMalformedMarkers = errors.New("forge markers are malformed")
 func UpsertSection(existing, title, body string) (string, error) {
 	block := BeginMarker + "\n" + strings.TrimSpace(body) + "\n" + EndMarker + "\n"
 
-	begins := strings.Count(existing, beginPrefix)
-	ends := strings.Count(existing, EndMarker)
+	begins, ends := findMarkers(existing)
 	switch {
-	case begins == 0 && ends == 0:
+	case len(begins) == 0 && len(ends) == 0:
 		if strings.TrimSpace(existing) == "" {
 			return "# " + title + "\n\n" + block, nil
 		}
 		return strings.TrimRight(existing, "\n") + "\n\n" + block, nil
-	case begins != 1 || ends != 1:
-		return "", fmt.Errorf("%w: found %d begin and %d end markers", ErrMalformedMarkers, begins, ends)
-	}
-
-	start := strings.Index(existing, beginPrefix)
-	end := strings.Index(existing, EndMarker)
-	if end < start {
+	case len(begins) != 1 || len(ends) != 1:
+		return "", fmt.Errorf("%w: found %d begin and %d end markers", ErrMalformedMarkers, len(begins), len(ends))
+	case ends[0].start < begins[0].start:
 		return "", fmt.Errorf("%w: end marker comes before begin marker", ErrMalformedMarkers)
 	}
-	after := existing[end+len(EndMarker):]
-	after = strings.TrimPrefix(after, "\n")
-	return existing[:start] + block + after, nil
+	return existing[:begins[0].start] + block + existing[ends[0].end:], nil
+}
+
+// lineSpan is the byte range of one line, including its newline.
+type lineSpan struct{ start, end int }
+
+// findMarkers locates the marker lines in s. A marker must be alone on its
+// line, so prose or inline code that merely mentions one is ordinary text.
+func findMarkers(s string) (begins, ends []lineSpan) {
+	off := 0
+	for _, line := range strings.SplitAfter(s, "\n") {
+		span := lineSpan{off, off + len(line)}
+		off = span.end
+		switch text := strings.TrimRight(line, " \t\r\n"); {
+		case isBeginMarker(text):
+			begins = append(begins, span)
+		case text == EndMarker:
+			ends = append(ends, span)
+		}
+	}
+	return begins, ends
+}
+
+// isBeginMarker matches on the prefix, not all of BeginMarker, so rewording the
+// generated notice doesn't orphan blocks already written to users' files.
+func isBeginMarker(line string) bool {
+	rest, ok := strings.CutPrefix(line, beginPrefix)
+	return ok && strings.HasPrefix(rest, " ") && strings.HasSuffix(rest, "-->")
 }
 
 // RenderFacts renders Facts as the markdown body of the managed block.
@@ -359,8 +379,11 @@ type SyncResult struct {
 
 // SyncContext renders f into each target's file under root. With write=false
 // nothing touches disk (dry run); results still say what would change.
+//
+// Every target is read and rendered before the first write, so a problem in
+// one file (say, malformed markers) leaves all of them untouched.
 func SyncContext(root string, f Facts, targets []string, write bool) ([]SyncResult, error) {
-	var results []SyncResult
+	results := make([]SyncResult, 0, len(targets))
 	for _, t := range targets {
 		file := targetFiles[t]
 		body := RenderFacts(f)
@@ -368,23 +391,28 @@ func SyncContext(root string, f Facts, targets []string, write bool) ([]SyncResu
 			body = ClaudeImportBody
 		}
 
-		path := filepath.Join(root, file)
-		old, err := os.ReadFile(path)
+		old, err := os.ReadFile(filepath.Join(root, file))
 		created := errors.Is(err, os.ErrNotExist)
 		if err != nil && !created {
-			return results, err
+			return nil, err
 		}
 		next, err := UpsertSection(string(old), f.Name, body)
 		if err != nil {
-			return results, fmt.Errorf("%s: %w — fix or remove the forge markers by hand", file, err)
+			return nil, fmt.Errorf("%s: %w — fix or remove the forge markers by hand", file, err)
 		}
-		r := SyncResult{Target: t, File: file, Content: next, Changed: next != string(old), Created: created}
-		if write && r.Changed {
-			if err := writeAtomic(path, []byte(next)); err != nil {
-				return results, err
-			}
+		results = append(results, SyncResult{Target: t, File: file, Content: next, Changed: next != string(old), Created: created})
+	}
+
+	if !write {
+		return results, nil
+	}
+	for _, r := range results {
+		if !r.Changed {
+			continue
 		}
-		results = append(results, r)
+		if err := writeAtomic(filepath.Join(root, r.File), []byte(r.Content)); err != nil {
+			return nil, fmt.Errorf("%s: %w", r.File, err)
+		}
 	}
 	return results, nil
 }
