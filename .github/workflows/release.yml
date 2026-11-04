@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch: # dry run: builds everything, publishes nothing
 
 permissions:
   contents: write
@@ -25,6 +26,6 @@ jobs:
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
-          args: release --clean
+          args: release --clean ${{ github.ref_type != 'tag' && '--snapshot' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
