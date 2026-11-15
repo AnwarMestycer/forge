@@ -119,6 +119,7 @@ async fn jitter_never_reorders_bytes() {
     let faults = Faults {
         latency: ms(80),
         jitter: ms(80),
+        ..Default::default()
     };
     let p = proxy(echo_server().await, faults).await;
     let c = TcpStream::connect(p).await.unwrap();
@@ -157,4 +158,78 @@ async fn half_close_still_delivers_the_response() {
     let mut got = Vec::new();
     c.read_to_end(&mut got).await.unwrap();
     assert_eq!(got.len(), payload.len());
+}
+
+#[tokio::test]
+async fn reset_reaches_the_client_as_econnreset() {
+    let faults = Faults {
+        reset: 1.0,
+        ..Default::default()
+    };
+    let p = proxy(echo_server().await, faults).await;
+    let mut c = TcpStream::connect(p).await.unwrap();
+    c.write_all(b"SELECT 1").await.unwrap();
+
+    let mut buf = [0u8; 8];
+    let err = c
+        .read(&mut buf)
+        .await
+        .expect_err("an RST, not data or a clean EOF");
+    assert_eq!(err.kind(), std::io::ErrorKind::ConnectionReset);
+}
+
+#[tokio::test]
+async fn total_loss_stalls_through_every_retransmission_then_resets() {
+    // rto 5 ms: 5 + 10 + 20 + 40 + 80 + 160 = 315 ms of retransmissions.
+    let faults = Faults {
+        loss: 1.0,
+        rto: ms(5),
+        ..Default::default()
+    };
+    let p = proxy(echo_server().await, faults).await;
+    let mut c = TcpStream::connect(p).await.unwrap();
+
+    let t = Instant::now();
+    c.write_all(b"x").await.unwrap();
+    let mut buf = [0u8; 1];
+    let err = c.read(&mut buf).await.expect_err("the link gives up");
+    assert_eq!(err.kind(), std::io::ErrorKind::ConnectionReset);
+    assert!(t.elapsed() >= ms(315), "gave up after {:?}", t.elapsed());
+}
+
+#[tokio::test]
+async fn a_loss_holds_back_the_bytes_behind_it() {
+    // Seed 1 with loss 0.5: some chunks are lost. Whatever happens, bytes
+    // arrive complete and in order, just later (head-of-line blocking).
+    let faults = Faults {
+        loss: 0.5,
+        rto: ms(10),
+        ..Default::default()
+    };
+    let p = proxy(echo_server().await, faults).await;
+    let c = TcpStream::connect(p).await.unwrap();
+    c.set_nodelay(true).unwrap();
+    let (mut r, mut w) = c.into_split();
+
+    tokio::spawn(async move {
+        for i in 0..20u8 {
+            if w.write_all(&[i]).await.is_err() {
+                return; // six losses in a row reset the link; fine
+            }
+            sleep(ms(2)).await;
+        }
+    });
+    let mut got = Vec::new();
+    let mut buf = [0u8; 20];
+    while got.len() < 20 {
+        match r.read(&mut buf).await {
+            Ok(0) | Err(_) => break,
+            Ok(n) => got.extend_from_slice(&buf[..n]),
+        }
+    }
+    assert_eq!(
+        got,
+        (0..got.len() as u8).collect::<Vec<u8>>(),
+        "a prefix, in order"
+    );
 }

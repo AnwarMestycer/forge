@@ -19,7 +19,16 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio::time::{Instant, sleep, sleep_until};
 
-use crate::faults::{Dice, Faults};
+use crate::faults::{Dice, Fate, Faults};
+
+/// How one direction of a connection ended.
+#[derive(Debug, PartialEq)]
+enum End {
+    /// The sender closed it (FIN), and that was passed on.
+    Closed,
+    /// A fault reset the connection.
+    Reset,
+}
 
 /// Bytes per read. Also the largest unit a fault applies to.
 const CHUNK: usize = 16 * 1024;
@@ -78,30 +87,66 @@ async fn relay(client: TcpStream, server: TcpStream, cfg: &Config, id: u64) -> i
     let (mut server_r, mut server_w) = server.into_split();
     let seed = cfg.seed.wrapping_add(id.wrapping_mul(2));
 
-    let up = direction(
-        &mut client_r,
-        &mut server_w,
-        Dice::new(cfg.faults.clone(), seed),
-        cfg,
-        "client -> server",
-    );
-    let down = direction(
-        &mut server_r,
-        &mut client_w,
-        Dice::new(cfg.faults.clone(), seed + 1),
-        cfg,
-        "server -> client",
-    );
+    // Scoped so the futures (and their borrows of the halves) are gone
+    // before a reset needs the sockets.
+    let end = {
+        let up = direction(
+            &mut client_r,
+            &mut server_w,
+            Dice::new(cfg.faults.clone(), seed),
+            cfg,
+            "client -> server",
+        );
+        let down = direction(
+            &mut server_r,
+            &mut client_w,
+            Dice::new(cfg.faults.clone(), seed.wrapping_add(1)),
+            cfg,
+            "server -> client",
+        );
 
-    // A side closing its half (FIN) ends one direction; the other keeps
-    // flowing until its sender closes too — a client that sends a request
-    // then shuts down writing still gets the whole response. An error ends
-    // the connection at once: the other direction is dropped, closing both.
-    tokio::pin!(up, down);
-    tokio::select! {
-        r = &mut up => { r?; down.await }
-        r = &mut down => { r?; up.await }
+        // A side closing its half (FIN) ends one direction; the other keeps
+        // flowing until its sender closes too — a client that sends a
+        // request then shuts down writing still gets the whole response. A
+        // reset or an error ends the connection at once.
+        tokio::pin!(up, down);
+        tokio::select! {
+            r = &mut up => match r { Ok(End::Closed) => down.await, other => other },
+            r = &mut down => match r { Ok(End::Closed) => up.await, other => other },
+        }
+    };
+
+    match end {
+        Ok(End::Closed) => Ok(()),
+        Ok(End::Reset) => {
+            println!("[~] conn {id}: reset injected");
+            abort(client_r, client_w);
+            abort(server_r, server_w);
+            Ok(())
+        }
+        Err(e) => {
+            // One side failed (often: it reset us). Reset the other rather
+            // than leave it waiting on a connection that is gone.
+            abort(client_r, client_w);
+            abort(server_r, server_w);
+            Err(e)
+        }
     }
+}
+
+/// Closes the connection with a reset (RST) instead of a FIN.
+///
+/// With `SO_LINGER` on and a timeout of 0, `close()` discards unsent data and
+/// sends RST; the peer's next read or write fails with ECONNRESET
+/// ("connection reset by peer"). The write half is `forget`-ed because
+/// dropping it normally calls `shutdown(SHUT_WR)`, which would send a FIN
+/// first — the peer would see a clean EOF before the reset.
+fn abort(r: OwnedReadHalf, w: OwnedWriteHalf) {
+    if let Err(e) = socket2::SockRef::from(r.as_ref()).set_linger(Some(Duration::ZERO)) {
+        eprintln!("[!] cannot set SO_LINGER for a reset: {e}");
+    }
+    w.forget();
+    drop(r); // last handle: the socket closes here, with RST
 }
 
 /// Relays one direction until the sender closes it, then closes it onward.
@@ -111,7 +156,7 @@ async fn direction(
     mut dice: Dice,
     cfg: &Config,
     label: &str,
-) -> io::Result<()> {
+) -> io::Result<End> {
     let (tx, mut rx) = mpsc::channel::<(Instant, Vec<u8>)>(IN_FLIGHT);
 
     let reader = async move {
@@ -120,12 +165,26 @@ async fn direction(
         loop {
             let n = from.read(&mut buf).await?;
             if n == 0 {
-                return Ok::<(), io::Error>(()); // EOF: dropping tx lets the writer drain and finish
+                return Ok::<End, io::Error>(End::Closed); // EOF: dropping tx lets the writer drain and finish
             }
-            let due = (Instant::now() + dice.delay()).max(prev_due);
+            let now = Instant::now();
+            let delay = match dice.roll() {
+                Fate::Deliver { delay, retransmits } => {
+                    if retransmits > 0 && cfg.verbose {
+                        println!("    {label}: chunk lost {retransmits}× (+{delay:?})");
+                    }
+                    delay
+                }
+                Fate::Reset { after } => {
+                    // Chunks already queued still go out meanwhile.
+                    sleep(after).await;
+                    return Ok(End::Reset);
+                }
+            };
+            let due = (now + delay).max(prev_due);
             prev_due = due;
             if tx.send((due, buf[..n].to_vec())).await.is_err() {
-                return Ok(()); // writer stopped (it reports why)
+                return Ok(End::Closed); // writer stopped (it reports why)
             }
         }
     };
@@ -146,7 +205,10 @@ async fn direction(
     // channel stays open while the reader holds `tx`.
     tokio::pin!(writer);
     tokio::select! {
-        r = reader => { r?; (&mut writer).await }
-        w = &mut writer => w,
+        r = reader => match r? {
+            End::Closed => (&mut writer).await.map(|()| End::Closed),
+            End::Reset => Ok(End::Reset),
+        },
+        w = &mut writer => w.map(|()| End::Closed),
     }
 }

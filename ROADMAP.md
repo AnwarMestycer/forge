@@ -71,7 +71,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 ## M3 — Fault proxy (Rust) — the systems core
 **M3a — TCP**
 - [x] Latency + jitter
-- [ ] Packet drops, connection resets
+- [x] Packet drops, connection resets
 - [ ] Bandwidth throttling
 
 **M3b — Postgres-aware**
@@ -133,6 +133,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 2026-10-31 | `forge switch` shells out to `docker compose` (`$FORGE_COMPOSE` overrides) and `git` instead of the Docker SDK / go-git: compose has no Engine-API equivalent, and the git CLI is faster and matches what the user sees. Engine SDK stays the plan for chaos (M4) |
 | 2026-10-31 | Stack is auto-detected from marker files in the project root + one level down (monorepos); `--stack/--compose/--env` override |
 | 2026-11-15 | Proxy latency is pipelined (each chunk is stamped with a due time on read; a writer task releases it), not a per-chunk sleep — so latency doesn't multiply with chunk count. Chunks never overtake each other (TCP order). Default latency is now 0; every fault run prints its seed (`--seed` replays it) |
+| 2026-11-15 | Proxy "packet loss" stalls a chunk for a TCP retransmission timeout (RTO, doubling per repeat, reset after 6) instead of discarding bytes: the proxy sees a byte stream, dropping bytes would corrupt it, and real loss is felt by apps as retransmit delay + head-of-line blocking. Resets are real RSTs (`SO_LINGER` 0) |
 
 ## Rules
 - **Dogfood from M1.** If you don't use it daily, fix that first.
