@@ -14,7 +14,7 @@ Pace: ~8–10 h/week, part-time. Two tracks run in parallel (Go on weekdays, Rus
 | Testbed | Sample NestJS + Postgres app | — | 1 | 🟢 Done |
 | M1 | Forge core | Go | 2–3 | 🟡 In progress |
 | M2 | Vouch v1 (rules) | Go | 4–5 | ⚪ Not started |
-| M3a | Fault proxy: TCP | Rust | 3–6 | ⚪ Not started |
+| M3a | Fault proxy: TCP | Rust | 3–6 | 🟡 In progress |
 | M3b | Fault proxy: Postgres-aware | Rust | 7–8 | ⚪ Not started |
 | M3c | Fault proxy: control API | Rust | 9 | ⚪ Not started |
 | M4 | Chaos stage | Go → Rust | 7–8 | ⚪ Not started |
@@ -70,7 +70,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 
 ## M3 — Fault proxy (Rust) — the systems core
 **M3a — TCP**
-- [ ] Latency + jitter
+- [x] Latency + jitter
 - [ ] Packet drops, connection resets
 - [ ] Bandwidth throttling
 
@@ -132,6 +132,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 | 2026-10-31 | Agent context is tool-neutral: one set of facts rendered into `AGENTS.md` (the cross-tool standard), and `CLAUDE.md` gets a managed block that imports it (`@AGENTS.md` — Claude Code reads only CLAUDE.md when one exists). forge edits only between `<!-- forge:begin/end -->` markers; output is deterministic so re-sync is a no-op. More targets (gemini, copilot, cursor) are small additions |
 | 2026-10-31 | `forge switch` shells out to `docker compose` (`$FORGE_COMPOSE` overrides) and `git` instead of the Docker SDK / go-git: compose has no Engine-API equivalent, and the git CLI is faster and matches what the user sees. Engine SDK stays the plan for chaos (M4) |
 | 2026-10-31 | Stack is auto-detected from marker files in the project root + one level down (monorepos); `--stack/--compose/--env` override |
+| 2026-11-15 | Proxy latency is pipelined (each chunk is stamped with a due time on read; a writer task releases it), not a per-chunk sleep — so latency doesn't multiply with chunk count. Chunks never overtake each other (TCP order). Default latency is now 0; every fault run prints its seed (`--seed` replays it) |
 
 ## Rules
 - **Dogfood from M1.** If you don't use it daily, fix that first.
