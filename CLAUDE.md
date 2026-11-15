@@ -43,7 +43,8 @@ forge (Go CLI / TUI)            forge-proxy (Rust)
 ```bash
 go build -o bin/forge ./cmd/forge && go test ./... && golangci-lint run
 cd proxy && cargo build && cargo test && cargo clippy -- -D warnings
-cd proxy && cargo run -- 127.0.0.1:6544 127.0.0.1:5432 200   # spike proxy
+cd proxy && cargo run -- 127.0.0.1:6544 127.0.0.1:5432 200   # proxy, 200 ms latency
+cd proxy && cargo run -- --help                               # all faults: jitter, loss, reset, bandwidth, seed
 just snapshot                                                 # local release dry run → dist/
 just run-testbed / just stop-testbed                          # testbed (PROXY_DELAY_MS=50 default)
 ```
@@ -59,7 +60,8 @@ just run-testbed / just stop-testbed                          # testbed (PROXY_D
 - Spike: done — Rust TCP proxy with fixed latency (`proxy/src/main.rs`) verified against real Postgres: `select 1` takes ~2 s via `psql -p 6544` vs ~26 ms direct.
 - Testbed: done — `just run-testbed` brings up `testbed/` (NestJS API on :3000 → forge-proxy :6544 → Postgres :5432). Endpoints: `POST /auth/signup`, `POST /auth/login` (JWT), `GET /users/me` (RLS-scoped), `GET /health`. `just stop-testbed` tears it down.
 - M1: in progress — all three tasks are built; the milestone stays open until `forge switch` is in daily use on 2 real projects. `forge add` records stack, compose and env files (re-running refreshes the project). `forge switch <name>` starts containers via `docker compose`, loads env and prints where you left off. `forge context sync` writes `AGENTS.md`, plus a `CLAUDE.md` block that imports it, inside a marked block it owns.
-- Recommended order: M3a next, while dogfooding M1. M3 (fault proxy) is the riskiest part of the critical path — start it early.
+- M3a: done — `proxy/` is a lib (`faults.rs` = seeded per-chunk dice, `relay.rs` = per-direction reader → bounded queue → paced writer) + clap CLI. Faults: `--latency-ms`/positional, `--jitter-ms`, `--loss` (retransmit stall with RTO backoff, not byte drops), `--reset` (real RST via `SO_LINGER` 0), `--bandwidth`, `--seed`. Integration tests in `proxy/tests/relay.rs` run an echo server behind the proxy on loopback.
+- Recommended order: M3b next (Postgres wire protocol), while dogfooding M1 on masrouf.
 
 ## Conventions
 - Small commits, one task per commit, message prefixed with the milestone (`M0: ...`, `Spike: ...`).

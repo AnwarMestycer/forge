@@ -41,12 +41,12 @@ justfile
 
 ## Recent work
 
-- M0: CI actions on Node 24, runners pinned instead of ubuntu-latest
-- M1: forge context sync writes AGENTS.md and CLAUDE.md from project facts
-- M1: forge switch starts containers, loads env, shows where you left off
-- M1: re-running forge add refreshes a registered project
-- M1: forge add records stack, compose file and env file
-- M0: snapshot versions sort by build time so rpm/deb upgrades work
-- M0: GoReleaser shipping forge + forge-proxy together
-- M0: ~/.forge config + SQLite projects table; forge add/list
+- M3: proxy bandwidth throttling (--bandwidth 64K)
+- M3: proxy injects packet loss (as retransmit stalls) and connection resets
+- M3: proxy latency + jitter, pipelined so it doesn't multiply per chunk
+- M1: context sync gives Flutter apps their env defines, codegen and analyze
+- M1: forge add --help shows --env's value type, not a word from its description
+- M0: release workflow can dry-run from CI without publishing
+- M1: context sync only treats whole lines as markers, and fails before writing
+- M1: dogfood forge context sync on forge; Current state covers M1
 <!-- forge:end -->
