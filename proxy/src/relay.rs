@@ -190,9 +190,10 @@ async fn direction(
     };
 
     let writer = async move {
+        let mut pace = Pace::new(cfg.faults.bandwidth);
         while let Some((due, data)) = rx.recv().await {
             sleep_until(due).await;
-            to.write_all(&data).await?;
+            pace.write(to, &data).await?;
             if cfg.verbose {
                 println!("    {label}: {} bytes", data.len());
             }
@@ -210,5 +211,40 @@ async fn direction(
             End::Reset => Ok(End::Reset),
         },
         w = &mut writer => w.map(|()| End::Closed),
+    }
+}
+
+/// Writes no faster than a fixed rate, in small slices so the flow is even.
+///
+/// When the writer falls behind, the bounded queue fills, the reader stops
+/// reading, the kernel's receive buffer fills, and TCP's flow control
+/// (the advertised window drops to zero) makes the sender wait: a slow link
+/// slows the sender down instead of the proxy buffering without limit.
+struct Pace {
+    rate: Option<u64>,
+    next: Instant,
+}
+
+impl Pace {
+    fn new(rate: Option<u64>) -> Self {
+        Self {
+            rate,
+            next: Instant::now(),
+        }
+    }
+
+    async fn write(&mut self, to: &mut OwnedWriteHalf, data: &[u8]) -> io::Result<()> {
+        let Some(rate) = self.rate else {
+            return to.write_all(data).await;
+        };
+        // ~20 ms worth of bytes per write.
+        let slice = (rate / 50).clamp(1, CHUNK as u64) as usize;
+        for piece in data.chunks(slice) {
+            sleep_until(self.next).await;
+            let start = Instant::now();
+            to.write_all(piece).await?;
+            self.next = start + Duration::from_secs_f64(piece.len() as f64 / rate as f64);
+        }
+        Ok(())
     }
 }

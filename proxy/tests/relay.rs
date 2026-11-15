@@ -233,3 +233,27 @@ async fn a_loss_holds_back_the_bytes_behind_it() {
         "a prefix, in order"
     );
 }
+
+#[tokio::test]
+async fn bandwidth_caps_throughput() {
+    // 64 KiB at 128 KiB/s takes ~0.5 s each way. The echo's return trip is
+    // throttled too but overlaps with the way out, so ~0.5–0.6 s in total.
+    let faults = Faults {
+        bandwidth: Some(128 * 1024),
+        ..Default::default()
+    };
+    let p = proxy(echo_server().await, faults).await;
+    let c = TcpStream::connect(p).await.unwrap();
+    let (mut r, mut w) = c.into_split();
+
+    let t = Instant::now();
+    tokio::spawn(async move {
+        w.write_all(&vec![1u8; 64 * 1024]).await.unwrap();
+        w
+    });
+    let mut got = vec![0u8; 64 * 1024];
+    r.read_exact(&mut got).await.unwrap();
+    let elapsed = t.elapsed();
+    assert!(elapsed >= ms(450), "too fast for 128 KiB/s: {elapsed:?}");
+    assert!(elapsed < ms(2000), "too slow: {elapsed:?}");
+}

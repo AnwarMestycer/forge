@@ -3,13 +3,14 @@
 //!   forge-proxy 127.0.0.1:6544 127.0.0.1:5432 200          # 200 ms latency
 //!   forge-proxy 127.0.0.1:6544 127.0.0.1:5432 --latency-ms 50 --jitter-ms 30
 //!   forge-proxy 127.0.0.1:6544 127.0.0.1:5432 --loss 0.02 --reset 0.001
+//!   forge-proxy 127.0.0.1:6544 127.0.0.1:5432 --bandwidth 64K
 
 use std::time::Duration;
 
 use clap::Parser;
 use tokio::net::TcpListener;
 
-use forge_proxy::faults::Faults;
+use forge_proxy::faults::{Faults, parse_bandwidth};
 use forge_proxy::relay::{self, Config};
 
 #[derive(Parser)]
@@ -41,6 +42,9 @@ struct Args {
     /// Probability (0–1) per chunk that the connection is reset (RST).
     #[arg(long, default_value_t = 0.0, value_parser = probability)]
     reset: f64,
+    /// Throughput cap per direction, bytes/s: 500, 64K (KiB/s), 1.5M (MiB/s).
+    #[arg(long, value_parser = parse_bandwidth)]
+    bandwidth: Option<u64>,
     /// Seed for the fault dice; the same seed replays the same faults.
     #[arg(long)]
     seed: Option<u64>,
@@ -59,14 +63,20 @@ async fn main() -> std::io::Result<()> {
         loss: args.loss,
         rto: Duration::from_millis(args.rto_ms),
         reset: args.reset,
+        bandwidth: args.bandwidth,
     };
     let seed = args.seed.unwrap_or_else(rand::random);
 
     let listener = TcpListener::bind(&args.listen).await?;
     println!("forge-proxy: {} -> {}", args.listen, args.upstream);
     println!(
-        "  latency {latency_ms} ms ± {} ms, loss {} (rto {} ms), reset {}, seed {seed}",
-        args.jitter_ms, args.loss, args.rto_ms, args.reset
+        "  latency {latency_ms} ms ± {} ms, loss {} (rto {} ms), reset {}, bandwidth {}, seed {seed}",
+        args.jitter_ms,
+        args.loss,
+        args.rto_ms,
+        args.reset,
+        args.bandwidth
+            .map_or("unlimited".to_string(), |b| format!("{b} B/s")),
     );
 
     relay::serve(

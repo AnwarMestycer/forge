@@ -14,7 +14,7 @@ Pace: ~8–10 h/week, part-time. Two tracks run in parallel (Go on weekdays, Rus
 | Testbed | Sample NestJS + Postgres app | — | 1 | 🟢 Done |
 | M1 | Forge core | Go | 2–3 | 🟡 In progress |
 | M2 | Vouch v1 (rules) | Go | 4–5 | ⚪ Not started |
-| M3a | Fault proxy: TCP | Rust | 3–6 | 🟡 In progress |
+| M3a | Fault proxy: TCP | Rust | 3–6 | 🟢 Done |
 | M3b | Fault proxy: Postgres-aware | Rust | 7–8 | ⚪ Not started |
 | M3c | Fault proxy: control API | Rust | 9 | ⚪ Not started |
 | M4 | Chaos stage | Go → Rust | 7–8 | ⚪ Not started |
@@ -72,7 +72,7 @@ Legend: ⚪ not started · 🟡 in progress · 🟢 done · 🔴 blocked
 **M3a — TCP**
 - [x] Latency + jitter
 - [x] Packet drops, connection resets
-- [ ] Bandwidth throttling
+- [x] Bandwidth throttling
 
 **M3b — Postgres-aware**
 - [ ] Parse Postgres wire protocol (`pgwire`)

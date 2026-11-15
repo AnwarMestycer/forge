@@ -33,6 +33,8 @@ pub struct Faults {
     pub rto: Duration,
     /// Probability (0–1) per chunk that the connection is reset (RST) instead.
     pub reset: f64,
+    /// Cap on throughput, in bytes per second, for each direction.
+    pub bandwidth: Option<u64>,
 }
 
 impl Default for Faults {
@@ -43,7 +45,29 @@ impl Default for Faults {
             loss: 0.0,
             rto: Duration::from_millis(200),
             reset: 0.0,
+            bandwidth: None,
         }
+    }
+}
+
+/// Parses a rate in bytes per second: `500`, `64K` (KiB/s), `1.5M` (MiB/s).
+pub fn parse_bandwidth(s: &str) -> Result<u64, String> {
+    let (num, unit) = match s.trim().char_indices().last() {
+        Some((i, c)) if c.is_ascii_alphabetic() => (&s[..i], c.to_ascii_uppercase()),
+        _ => (s, ' '),
+    };
+    let mult = match unit {
+        ' ' => 1.0,
+        'K' => 1024.0,
+        'M' => 1024.0 * 1024.0,
+        'G' => 1024.0 * 1024.0 * 1024.0,
+        _ => return Err(format!("{s:?}: unit must be K, M or G (bytes per second)")),
+    };
+    match num.trim().parse::<f64>() {
+        Ok(n) if n * mult >= 1.0 => Ok((n * mult) as u64),
+        _ => Err(format!(
+            "{s:?} is not a rate like 500, 64K or 1.5M (bytes per second)"
+        )),
     }
 }
 
@@ -231,5 +255,14 @@ mod tests {
                 delay: Duration::ZERO,
                 retransmits: 0
             }));
+    }
+
+    #[test]
+    fn parses_bandwidth_with_binary_suffixes() {
+        assert_eq!(parse_bandwidth("500"), Ok(500));
+        assert_eq!(parse_bandwidth("64K"), Ok(64 * 1024));
+        assert_eq!(parse_bandwidth("1.5m"), Ok(1_572_864));
+        assert!(parse_bandwidth("0").is_err());
+        assert!(parse_bandwidth("fast").is_err());
     }
 }
