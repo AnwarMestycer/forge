@@ -88,7 +88,7 @@ the project directory. Only the env file's path is stored, never its contents.`,
 	f.StringVar(&name, "name", "", "project name (default: directory name)")
 	f.StringVar(&stack, "stack", "", "comma-separated stack, e.g. nestjs,supabase (default: detected)")
 	f.StringVar(&compose, "compose", "", "Docker Compose file (default: detected)")
-	f.StringVar(&env, "env", "", "env file loaded by `forge switch` (default: .env if present)")
+	f.StringVar(&env, "env", "", "env file loaded by forge switch (default: .env if present)")
 	return cmd
 }
 
