@@ -242,3 +242,44 @@ func TestNormalizeTargets(t *testing.T) {
 		t.Fatal("empty targets should fail")
 	}
 }
+
+func TestFlutterCommands(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, map[string]string{
+		"pubspec.yaml":        "name: app\ndependencies:\n  flutter:\n    sdk: flutter\ndev_dependencies:\n  build_runner: ^2.4.0\n",
+		"app.env":             "SUPABASE_URL=https://x.supabase.co\n",
+		"mobile/pubspec.yaml": "name: mobile\ndependencies:\n  flutter:\n    sdk: flutter\n",
+	})
+
+	md := RenderFacts(mustGather(t, root, "app.env"))
+	for _, want := range []string{
+		"| run | `flutter run --dart-define-from-file=app.env` |",
+		"| codegen | `dart run build_runner build` |",
+		"| analyze | `flutter analyze` |",
+		"| test | `flutter test` |",
+		// a nested app gets the env path relative to its own directory
+		"| run (mobile) | `cd mobile && flutter run --dart-define-from-file=../app.env` |",
+		"| analyze (mobile) | `cd mobile && flutter analyze` |",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("render missing %q\n%s", want, md)
+		}
+	}
+	if strings.Contains(md, "codegen (mobile)") {
+		t.Errorf("mobile has no build_runner, so no codegen command\n%s", md)
+	}
+
+	// No env file registered: plain flutter run.
+	if md := RenderFacts(mustGather(t, root, "")); !strings.Contains(md, "| run | `flutter run` |") {
+		t.Errorf("without an env file, run should be plain\n%s", md)
+	}
+}
+
+func mustGather(t *testing.T, root, envFile string) Facts {
+	t.Helper()
+	f, err := GatherFacts(context.Background(), root, "app", []string{"flutter"}, "", envFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}

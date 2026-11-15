@@ -56,7 +56,7 @@ func GatherFacts(ctx context.Context, root, name string, stack []string, compose
 	}
 	f.Layout = layout
 
-	f.Commands = commands(root, layout, composeFile)
+	f.Commands = commands(root, layout, composeFile, envFile)
 
 	// Not a git repo (or no commits yet) just means no history section.
 	if log, err := gitOut(ctx, root, "log", fmt.Sprintf("-%d", recentCommits), "--format=%s", "--", "."); err == nil {
@@ -118,7 +118,7 @@ func topLevel(ctx context.Context, root string) ([]string, error) {
 
 // commands derives run/build/test commands from what's in the project root
 // and its top-level directories.
-func commands(root string, layout []string, composeFile string) []Command {
+func commands(root string, layout []string, composeFile, envFile string) []Command {
 	var cmds []Command
 	dirs := []string{"."}
 	for _, l := range layout {
@@ -143,7 +143,7 @@ func commands(root string, layout []string, composeFile string) []Command {
 				cmds = append(cmds, Command{s + label, prefix + run})
 			}
 		case isFile(filepath.Join(dir, "pubspec.yaml")):
-			cmds = append(cmds, Command{"run" + label, prefix + "flutter run"}, Command{"test" + label, prefix + "flutter test"})
+			cmds = append(cmds, flutterCommands(root, dir, envFile, prefix, label)...)
 		}
 		if isFile(filepath.Join(dir, "go.mod")) {
 			cmds = append(cmds, Command{"build" + label, prefix + "go build ./..."}, Command{"test" + label, prefix + "go test ./..."})
@@ -159,6 +159,41 @@ func commands(root string, layout []string, composeFile string) []Command {
 		cmds = append(cmds, Command{"start services", "docker compose -f " + composeFile + " up -d"})
 	}
 	return cmds
+}
+
+// flutterCommands covers a Flutter/Dart app in dir. A registered env file is
+// passed to `flutter run` via --dart-define-from-file, since a Flutter app only
+// sees its config as compile-time defines; build_runner is listed when the
+// project uses code generation (drift, freezed, json_serializable, ...).
+func flutterCommands(root, dir, envFile, prefix, label string) []Command {
+	run := "flutter run"
+	if envFile != "" {
+		if rel, err := filepath.Rel(dir, ResolvePath(root, envFile)); err == nil {
+			run += " --dart-define-from-file=" + filepath.ToSlash(rel)
+		}
+	}
+	cmds := []Command{{"run" + label, prefix + run}}
+	if pubspecHas(filepath.Join(dir, "pubspec.yaml"), "build_runner") {
+		cmds = append(cmds, Command{"codegen" + label, prefix + "dart run build_runner build"})
+	}
+	return append(cmds,
+		Command{"analyze" + label, prefix + "flutter analyze"},
+		Command{"test" + label, prefix + "flutter test"},
+	)
+}
+
+// pubspecHas reports whether pubspec.yaml declares pkg as a dependency key.
+func pubspecHas(path, pkg string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), pkg+":") && strings.HasPrefix(line, " ") {
+			return true
+		}
+	}
+	return false
 }
 
 // nodeScriptOrder lists the package.json scripts worth telling an agent about.
